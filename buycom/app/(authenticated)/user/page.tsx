@@ -353,7 +353,7 @@ export default function UserDashboard() {
                             <TableHead onClick={() => handleSort('Delay_days')} className="
 cursor-pointer">
                                 <div className="flex items-center">
-                                    Delay Days
+                                    Delay Days %
                                     {sortConfig?.key === 'Delay_days'
                                         ? (sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />)
                                         : <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -389,7 +389,7 @@ cursor-pointer">
                                 <TableCell>{item.state}</TableCell>
                                 <TableCell>{item.fetch_date}</TableCell>
                                 <TableCell>{item.Delay_days}</TableCell>
-                                <TableCell>{item.delayed_filling}%</TableCell>
+                                <TableCell>{item.delayed_filling}</TableCell>
                                 <TableCell>{item.result}</TableCell>
                                 <TableCell>
                                     <Button 
