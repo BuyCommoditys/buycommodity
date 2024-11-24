@@ -1,62 +1,69 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from "@/components/ui/input"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
+import API_URL from '@/config'
 
 export default function LoginPage() {
   const [isAdminLogin, setIsAdminLogin] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [isClient, setIsClient] = useState(false)
   const router = useRouter()
 
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-  
-    // Encode the username and password in Base64
-    const encodedCredentials = btoa(`${username}:${password}`);
-  
+    e.preventDefault()
+    setLoading(true) // Start loading
+
+    const encodedCredentials = btoa(`${username}:${password}`)
     try {
-      const response = await fetch('http://localhost:8000/api/login/', {
+      const response = await fetch(`${API_URL}/login/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Basic ${encodedCredentials}`,
         },
-        body: JSON.stringify({ username, password, loginAsAdmin: isAdminLogin }), // Indicate if admin login
-      });
-  
-      const data = await response.json();
-  
+        body: JSON.stringify({ username, password, loginAsAdmin: isAdminLogin }),
+      })
+
+      const data = await response.json()
+
       if (response.ok) {
-        localStorage.setItem('auth_tokens', data.token);
-        localStorage.setItem('user_role', data.role);
-        // const gettoken=localStorage.getItem("auth_token")
-        const getrole=localStorage.getItem("user_role")
-  
+        localStorage.setItem('auth_tokens', data.token)
+        localStorage.setItem('user_role', data.role)
+        const getrole = localStorage.getItem("user_role")
+
         if (data.role === 'admin') {
-          // If admin, allow access to admin and user dashboards
-          if (isAdminLogin && getrole==="admin" ) {
-            router.push('/admin'); // Redirect to admin dashboard if on admin panel
+          if (isAdminLogin && getrole === "admin") {
+            router.push('/admin')
           } else {
-            router.push('/user'); // Redirect to user dashboard if on user panel
+            router.push('/user')
           }
-          console.log("data : ", data);
-          
         } else {
-          // Redirect user to their dashboard
-          router.push('/user');
+          router.push('/user')
         }
       } else {
-        alert(data.non_field_errors || 'Invalid credentials');
+        alert(data.non_field_errors || 'Invalid credentials')
       }
     } catch (error) {
-      console.error('Error logging in:', error);
-      alert('An error occurred. Please try again later.');
+      console.error('Error logging in:', error)
+      alert('An error occurred. Please try again later.')
+    } finally {
+      setLoading(false) // Stop loading
     }
-  };
+  }
+
+  if (!isClient) {
+    return null
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -92,18 +99,29 @@ export default function LoginPage() {
           </form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
-          <Button type="submit" className="w-full" onClick={handleLogin}>
-            Login
+          <Button type="submit" className="w-full" onClick={handleLogin} disabled={loading}>
+            {loading ? 'Logging in...' : 'Login'}
           </Button>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             className="w-full"
             onClick={() => setIsAdminLogin(!isAdminLogin)}
+            disabled={loading}
           >
             {isAdminLogin ? 'Switch to User Login' : 'Login as Admin'}
           </Button>
         </CardFooter>
       </Card>
+
+      {loading && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <img
+            src="/gif/loading.gif"
+            alt="Loading..."
+            className="w-26 h-26"
+          />
+        </div>
+      )}
     </div>
-  );
+  )
 }

@@ -29,8 +29,10 @@ import {
 } from "@/components/ui/pagination"
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
+import API_URL from '@/config'
 
 import { UserOptions as AutoTableUserOptions } from 'jspdf-autotable'
+import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 
 interface AutoTableOptions extends Omit<AutoTableUserOptions, 'theme'> {
     startY: number;
@@ -39,7 +41,6 @@ interface AutoTableOptions extends Omit<AutoTableUserOptions, 'theme'> {
     theme?: 'striped' | 'grid' | 'plain' | 'css';
 }
 
-// Extend the jsPDF type to include autoTable
 declare module 'jspdf' {
     interface jsPDF {
         autoTable: (options: AutoTableOptions) => jsPDF;
@@ -49,26 +50,24 @@ declare module 'jspdf' {
     }
 }
 
-
-// Define the type for your item
 interface CompanyData {
-    id: number;
-    gstin: string;
-    legal_name: string;
-    registration_date: string;
-    trade_name: string;
-    last_update: string;
-    company_type: string;
-    state: string;
-    delayed_filling: string;
-    Delay_days: string;
-    return_status: string;
-    address: string;
-    result: string;
-    year: string;
-    month: string;
-    return_type: string;
-    date_of_filing: string;
+    id?: number;
+    gstin?: string;
+    legal_name?: string;
+    registration_date?: string;
+    trade_name?: string;
+    last_update?: string;
+    company_type?: string;
+    state?: string;
+    delayed_filling?: string;
+    Delay_days?: string;
+    return_status?: string;
+    address?: string;
+    result?: string;
+    year?: string;
+    month?: string;
+    return_type?: string;
+    date_of_filing?: string;
     annual_turnover?: number;
     fetch_date?: string;
 }
@@ -80,10 +79,11 @@ export default function AdminDashboard() {
     const [newStatus, setNewStatus] = useState<string>('')
     const [newAnnualTurnover, setNewAnnualTurnover] = useState<string>('')
     const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage] = useState(10)
+    const [itemsPerPage] = useState(5)
     const [isAuthenticated, setIsAuthenticated] = useState(false)
     const [isAdmin, setIsAdmin] = useState(false)
     const router = useRouter()
+    const [isLoading, setIsLoading] = useState(false);
     const [filters, setFilters] = useState({
         legal_name: '',
         gstin: '',
@@ -91,9 +91,9 @@ export default function AdminDashboard() {
         status: 'all',
     })
     const [searchQuery, setSearchQuery] = useState('')
+    const [sortConfig, setSortConfig] = useState<{ key: keyof CompanyData; direction: 'ascending' | 'descending' } | null>(null)
 
     useEffect(() => {
-        // Check if the user is logged in and if they are an admin
         const token = localStorage.getItem('auth_tokens')
         const userRole = localStorage.getItem('user_role')
 
@@ -110,28 +110,28 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         let filteredData = allData.filter(item =>
-            (filters.legal_name === '' || item.legal_name.toLowerCase().includes(filters.legal_name.toLowerCase())) &&
-            (filters.gstin === '' || item.gstin.toLowerCase().includes(filters.gstin.toLowerCase())) &&
-            (filters.state === '' || item.state.toLowerCase().includes(filters.state.toLowerCase())) &&
+            (filters.legal_name === '' || item.legal_name?.toLowerCase().includes(filters.legal_name.toLowerCase())) &&
+            (filters.gstin === '' || item.gstin?.toLowerCase().includes(filters.gstin.toLowerCase())) &&
+            (filters.state === '' || item.state?.toLowerCase().includes(filters.state.toLowerCase())) &&
             (filters.status === 'all' || item.result === filters.status)
-        );
-    
+        )
+
         if (searchQuery) {
             filteredData = filteredData.filter(item =>
-                item.gstin.toLowerCase().includes(searchQuery.toLowerCase())
-            );
+                item.gstin?.toLowerCase().includes(searchQuery.toLowerCase())
+            )
         }
-    
-        const uniqueData = Array.from(new Map(filteredData.map((item: CompanyData) => [item.gstin, item])).values());
-    
-        setDisplayData(uniqueData);
-        setCurrentPage(1);
-    }, [filters, searchQuery, allData]);
-    
+
+        const uniqueData = Array.from(new Map(filteredData.map((item: CompanyData) => [item.gstin, item])).values())
+        const sortedData = sortData(uniqueData)
+
+        setDisplayData(sortedData)
+        setCurrentPage(1)
+    }, [filters, searchQuery, allData, sortConfig])
 
     const fetchData = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/companies/')
+            const response = await fetch(`${API_URL}/companies/`)
             if (response.ok) {
                 const data = await response.json()
                 if (Array.isArray(data)) {
@@ -151,9 +151,9 @@ export default function AdminDashboard() {
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault()
-
+        setIsLoading(true);
         try {
-            const response = await fetch('http://localhost:8000/api/fetch_and_save_gst_record/', {
+            const response = await fetch(`${API_URL}/fetch_and_save_gst_record/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -165,6 +165,7 @@ export default function AdminDashboard() {
                 console.log("Record updated successfully");
 
                 setTimeout(fetchData, 1000);
+                setIsLoading(false);
             } else {
                 console.error("Failed to update record");
             }
@@ -197,7 +198,8 @@ export default function AdminDashboard() {
             };
 
             try {
-                const response = await fetch('http://localhost:8000/api/update_gst_record/', {
+                setIsLoading(true);
+                const response = await fetch(`${API_URL}/update_gst_record/`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -214,7 +216,7 @@ export default function AdminDashboard() {
             } catch (error) {
                 console.error("Error updating record:", error);
             }
-
+            setIsLoading(false);
             setEditingId(null);
             setNewStatus('');
             setNewAnnualTurnover('');
@@ -223,6 +225,22 @@ export default function AdminDashboard() {
 
     const handleFilterChange = (key: string, value: string) => {
         setFilters(prev => ({ ...prev, [key]: value }))
+    }
+
+    const filterDataForPDF = async (gstin: string): Promise<CompanyData | null> => {
+        try {
+            const response = await fetch(`${API_URL}/companies/${gstin}/`)
+            if (response.ok) {
+                const data = await response.json()
+                return data || null
+            } else {
+                console.error("Failed to fetch company data")
+                return null
+            }
+        } catch (error) {
+            console.error("Error fetching company data:", error)
+            return null
+        }
     }
 
     const getMonthName = (monthNumber: string): string => {
@@ -235,59 +253,139 @@ export default function AdminDashboard() {
         return months[monthIndex] || 'N/A';
     };
 
-    const generatePDF = (item: CompanyData) => {
-        const doc = new jsPDF();
-
-        doc.setFontSize(14);
-        doc.text('COMPANY GST3B SUMMARY', 14, 15);
-        doc.setFontSize(10);
-
-        const summaryTableData = [
-            ['GSTIN', item.gstin || 'N/A', 'STATUS', item.return_status || 'N/A'],
-            ['LEGAL NAME', item.legal_name || 'N/A', 'REG. DATE', item.registration_date || 'N/A'],
-            ['TRADE NAME', item.trade_name || 'N/A', 'LAST UPDATE DATE', item.last_update || 'N/A'],
-            ['COMPANY TYPE', item.company_type || 'N/A', 'STATE', item.state || 'N/A'],
-            ['% DELAYED FILLING', item.delayed_filling || 'N/A', 'AVG. DELAY DAYS', item.Delay_days || 'N/A'],
-            ['Address', item.address || 'N/A', 'Result', item.result || 'N/A'],
-        ];
-
-        doc.autoTable({
-            startY: 20,
-            head: [['', '', '', '']],
-            body: summaryTableData,
-            theme: 'grid',
-            headStyles: { fillColor: [230, 230, 230] },
-            styles: { fontSize: 10, cellPadding: 3, textColor: [0, 0, 0] },
-            columnStyles: { 0: { cellWidth: 45 }, 1: { cellWidth: 70 }, 2: { cellWidth: 45 }, 3: { cellWidth: 30 } },
-        } as AutoTableOptions);
-
-        const gstTableData = [[
-            item.year || 'N/A',
-            getMonthName(item.month) || 'N/A',
-            item.return_type || 'N/A',
-            item.date_of_filing || 'N/A',
-            item.delayed_filling || 'N/A',
-            item.Delay_days || 'N/A'
-        ]];
-
-        const yPos = doc.lastAutoTable?.finalY ? doc.lastAutoTable.finalY + 10 : 20;
-
-        doc.autoTable({
-            startY: yPos,
-            head: [['Year', 'Month', 'Return Type', 'Date of Filing', 'Delayed Filing', 'Delay Days']],
-            body: gstTableData,
-            theme: 'grid',
-            headStyles: { fillColor: [230, 230, 230] },
-            styles: { fontSize: 10, cellPadding: 3, textColor: [0, 0, 0] },
-            columnStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 30 }, 2: { cellWidth: 30 }, 3: { cellWidth: 30 }, 4: { cellWidth: 35 }, 5: { cellWidth: 30 } },
-        } as AutoTableOptions);
-
-        doc.save(`${item.legal_name}_summary.pdf`);
-    }
+    const generatePDF = async (gstin: string) => {
+        setIsLoading(true);
+        try {
+            const items = await filterDataForPDF(gstin);
+            console.log("items : ", items);
+    
+            if (!Array.isArray(items) || items.length === 0) {
+                console.error("No data found for the provided GSTIN or array is empty");
+                return;
+            }
+    
+            const doc = new jsPDF();
+            doc.setFontSize(14);
+            doc.text('COMPANY GST3B SUMMARY', 14, 15);
+            doc.setFontSize(10);
+    
+            const summaryTableData = [
+                ['GSTIN', items[0].gstin || 'N/A', 'STATUS', items[0].return_status || 'N/A'],
+                ['LEGAL NAME', items[0].legal_name || 'N/A', 'REG. DATE', items[0].registration_date || 'N/A'],
+                ['TRADE NAME', items[0].trade_name || 'N/A', 'LAST UPDATE DATE', items[0].last_update || 'N/A'],
+                ['COMPANY TYPE', items[0].company_type || 'N/A', 'STATE', items[0].state || 'N/A'],
+                ['% DELAYED FILLING', items[0].delayed_filling || 'N/A', 'AVG. DELAY DAYS', items[0].Delay_days || 'N/A'],
+                ['Address', items[0].address || 'N/A', 'Result', items[0].result || 'N/A'],
+            ];
+    
+            doc.autoTable({
+                startY: 20,
+                head: [['', '', '', '']],
+                body: summaryTableData,
+                theme: 'grid',
+                headStyles: { fillColor: [230, 230, 230] },
+                styles: { fontSize: 10, cellPadding: 3, textColor: [0, 0, 0] },
+                columnStyles: { 0: { cellWidth: 45 }, 1: { cellWidth: 70 }, 2: { cellWidth: 45 }, 3: { cellWidth: 30 } },
+            });
+    
+            const yPos = doc.lastAutoTable?.finalY ? doc.lastAutoTable.finalY + 10 : 20;
+    
+            const filingDetails: string[][] = [];
+            items.forEach((item) => {
+                if (item) {
+                    filingDetails.push([
+                        item.year || 'N/A',
+                        item.month || 'N/A',
+                        item.return_type || 'N/A',
+                        item.date_of_filing || 'N/A',
+                        item.delayed_filling || 'N/A',
+                        item.Delay_days || 'N/A'
+                    ]);
+                }
+            });
+    
+            filingDetails.sort((a, b) => {
+                const yearA = parseInt(a[0], 10);
+                const yearB = parseInt(b[0], 10);
+                const monthA = parseInt(a[1], 10);
+                const monthB = parseInt(b[1], 10);
+    
+                if (yearA > yearB) return -1;
+                if (yearA < yearB) return 1;
+    
+                if (monthA > monthB) return -1;
+                if (monthA < monthB) return 1;
+    
+                return 0;
+            });
+    
+            if (filingDetails.length > 24) {
+                filingDetails.splice(24);
+            }
+    
+            const sortedFilingDetails = filingDetails.map(item => [
+                item[0],
+                getMonthName(item[1]),
+                item[2],
+                item[3],
+                item[4],
+                item[5]
+            ]);
+    
+            doc.autoTable({
+                startY: yPos,
+                head: [['Year', 'Month', 'Return Type', 'Date of Filing', 'Delayed Filing', 'Delay Days']],
+                body: sortedFilingDetails,
+                theme: 'grid',
+                headStyles: { fillColor: [230, 230, 230] },
+                styles: { fontSize: 10, cellPadding: 3, textColor: [0, 0, 0] },
+                columnStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 30 }, 2: { cellWidth: 30 }, 3: { cellWidth: 30 }, 4: { cellWidth: 35 }, 5: { cellWidth: 30 } },
+            });
+    
+            doc.save(`${gstin}_summary.pdf`);
+        } catch (error) {
+            console.error("Error generating PDF:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page)
     }
+
+    const sortData = (data: CompanyData[]) => {
+        if (!sortConfig || !sortConfig.key) return data;
+        return [...data].sort((a, b) => {
+            const aValue = a[sortConfig.key];
+            const bValue = b[sortConfig.key];
+
+            if (aValue === undefined && bValue === undefined) return 0;
+            if (aValue === undefined) return 1;
+            if (bValue === undefined) return -1;
+
+            if (aValue < bValue) {
+                return sortConfig.direction === 'ascending' ? -1 : 1;
+            }
+            if (aValue > bValue) {
+                return sortConfig.direction === 'ascending' ? 1 : -1;
+            }
+            return 0;
+        });
+    };
+
+    const handleSort = (key: keyof CompanyData) => {
+        setSortConfig(prevConfig => {
+            if (!prevConfig || prevConfig.key !== key) {
+                return { key, direction: 'ascending' };
+            }
+            if (prevConfig.direction === 'ascending') {
+                return { key, direction: 'descending' };
+            }
+            return null;
+        });
+    };
 
     if (!isAuthenticated || !isAdmin) {
         return <div>Loading...</div>
@@ -305,7 +403,13 @@ export default function AdminDashboard() {
                             placeholder="Search by GSTIN"
                             className="flex-grow"
                         />
-                        <Button type="submit">Add Company</Button>
+                        <Button type="submit" disabled={isLoading}>
+                            {isLoading ? (
+                                <img src="/gif/loading.gif" alt="Loading..." className="w-6 h-6" />
+                            ) : (
+                                "Add Company"
+                            )}
+                        </Button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <Input
@@ -347,12 +451,60 @@ export default function AdminDashboard() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Company Name</TableHead>
-                            <TableHead>GSTIN</TableHead>
-                            <TableHead>State</TableHead>
-                            <TableHead>Fetch Date</TableHead>
-                            <TableHead>Annual Turnover</TableHead>
-                            <TableHead>Status</TableHead>
+                            <TableHead onClick={() => handleSort('legal_name')} className="cursor-pointer">
+                                <div className="flex items-center">
+                                    Company Name
+                                    {sortConfig?.key === 'legal_name'
+                                        ? (sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />)
+                                        : <ArrowUpDown className="ml-2 h-4 w-4" />
+                                    }
+                                </div>
+                            </TableHead>
+                            <TableHead onClick={() => handleSort('gstin')} className="cursor-pointer">
+                                <div className="flex items-center">
+                                    GSTIN
+                                    {sortConfig?.key === 'gstin'
+                                        ? (sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />)
+                                        : <ArrowUpDown className="ml-2 h-4 w-4" />
+                                    }
+                                </div>
+                            </TableHead>
+                            <TableHead onClick={() => handleSort('state')} className="cursor-pointer">
+                                <div className="flex items-center">
+                                    State
+                                    {sortConfig?.key === 'state'
+                                        ? (sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />)
+                                        : <ArrowUpDown className="ml-2 h-4 w-4" />
+                                    }
+                                </div>
+                            </TableHead>
+                            <TableHead onClick={() => handleSort('fetch_date')} className="cursor-pointer">
+                                <div className="flex items-center">
+                                    Fetch Date
+                                    {sortConfig?.key === 'fetch_date'
+                                        ? (sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />)
+                                        : <ArrowUpDown className="ml-2 h-4 w-4" />
+                                    }
+                                </div>
+                            </TableHead>
+                            <TableHead onClick={() => handleSort('annual_turnover')} className="cursor-pointer">
+                                <div className="flex items-center">
+                                    Annual Turnover (Cr.)
+                                    {sortConfig?.key === 'annual_turnover'
+                                        ? (sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />)
+                                        : <ArrowUpDown className="ml-2 h-4 w-4" />
+                                    }
+                                </div>
+                            </TableHead>
+                            <TableHead onClick={() => handleSort('result')} className="cursor-pointer">
+                                <div className="flex items-center">
+                                    Status
+                                    {sortConfig?.key === 'result'
+                                        ? (sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />)
+                                        : <ArrowUpDown className="ml-2 h-4 w-4" />
+                                    }
+                                </div>
+                            </TableHead>
                             <TableHead>Action</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -368,10 +520,16 @@ export default function AdminDashboard() {
                                     <TableCell>{item.annual_turnover || ''}</TableCell>
                                     <TableCell>{item.result || ''}</TableCell>
                                     <TableCell>
-                                        <Button variant="outline" size="sm" onClick={() => generatePDF(item)} className="mr-2">Download</Button>
+                                        <Button variant="outline" size="sm" onClick={() => generatePDF(item.gstin || '')} className="mr-2" type="submit" disabled={isLoading}>
+                                            {isLoading ? (
+                                                <img src="/gif/loading.gif" alt="Loading..." className="w-16 h-6" />
+                                            ) : (
+                                                "Download"
+                                            )}
+                                        </Button>
                                         <Dialog>
                                             <DialogTrigger asChild>
-                                                <Button variant="outline" onClick={() => setEditingId(item.id)} size="sm">Edit</Button>
+                                                <Button variant="outline" onClick={() => setEditingId(item.id || null)} size="sm">Edit</Button>
                                             </DialogTrigger>
                                             <DialogContent className="sm:max-w-[425px]">
                                                 <DialogHeader>
@@ -394,7 +552,7 @@ export default function AdminDashboard() {
                                                     </div>
                                                     <div className="grid grid-cols-4 items-center gap-4">
                                                         <label htmlFor="annual_turnover" className="text-right">
-                                                            Annual Turnover
+                                                            Annual Turnover (Cr.)
                                                         </label>
                                                         <Input
                                                             id="annual_turnover"
@@ -405,8 +563,13 @@ export default function AdminDashboard() {
                                                     </div>
                                                 </div>
                                                 <div className="flex justify-end space-x-4">
-                                                    <Button onClick={() => setEditingId(null)} variant="outline">Cancel</Button>
-                                                    <Button onClick={handleSaveChanges}>Save Changes</Button>
+                                                    <Button type="submit" disabled={isLoading} onClick={handleSaveChanges}>
+                                                        {isLoading ? (
+                                                            <img src="/gif/loading.gif" alt="Loading..." className="w-6 h-6" />
+                                                        ) : (
+                                                            "Save Changes"
+                                                        )}
+                                                    </Button>
                                                 </div>
                                             </DialogContent>
                                         </Dialog>
