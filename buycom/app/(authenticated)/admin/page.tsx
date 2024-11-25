@@ -415,19 +415,19 @@ export default function AdminDashboard() {
                             type="text"
                             value={filters.legal_name}
                             onChange={(e) => handleFilterChange('legal_name', e.target.value)}
-                            placeholder="Legal Name"
+                            placeholder="Filter By Legal Name"
                         />
                         <Input
                             type="text"
                             value={filters.gstin}
                             onChange={(e) => handleFilterChange('gstin', e.target.value)}
-                            placeholder="GSTIN"
+                            placeholder="Filter By GSTIN"
                         />
                         <Input
                             type="text"
                             value={filters.state}
                             onChange={(e) => handleFilterChange('state', e.target.value)}
-                            placeholder="State"
+                            placeholder="Filter By State"
                         />
                         <Select
                             value={filters.status}
