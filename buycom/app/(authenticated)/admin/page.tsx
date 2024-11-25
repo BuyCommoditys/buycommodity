@@ -19,14 +19,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import {
-    Pagination,
-    PaginationContent,
-    PaginationItem,
-    PaginationLink,
-    PaginationNext,
-    PaginationPrevious,
-} from "@/components/ui/pagination"
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
 import API_URL from '@/config'
@@ -151,6 +143,12 @@ export default function AdminDashboard() {
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault()
+
+        if (!searchQuery.trim()) {
+            alert("GSTIN IS EMPTY. PLEASE ENTER GSTIN.");
+            return;
+        }
+
         setIsLoading(true);
         try {
             const response = await fetch(`${API_URL}/fetch_and_save_gst_record/`, {
@@ -275,7 +273,7 @@ export default function AdminDashboard() {
                 ['TRADE NAME', items[0].trade_name || 'N/A', 'LAST UPDATE DATE', items[0].last_update || 'N/A'],
                 ['COMPANY TYPE', items[0].company_type || 'N/A', 'STATE', items[0].state || 'N/A'],
                 ['% DELAYED FILLING', items[0].delayed_filling || 'N/A', 'AVG. DELAY DAYS', items[0].Delay_days || 'N/A'],
-                ['Address', items[0].address || 'N/A', 'Result', items[0].result || 'N/A'],
+                ['Address', items[0].state || 'N/A', 'Result', items[0].result || 'N/A'],
             ];
     
             doc.autoTable({
@@ -350,10 +348,11 @@ export default function AdminDashboard() {
         }
     };
     
+    const paginate = (pageNumber: number) => setCurrentPage(pageNumber)
 
-    const handlePageChange = (page: number) => {
-        setCurrentPage(page)
-    }
+    // const handlePageChange = (page: number) => {
+    //     setCurrentPage(page)
+    // }
 
     const sortData = (data: CompanyData[]) => {
         if (!sortConfig || !sortConfig.key) return data;
@@ -580,26 +579,26 @@ export default function AdminDashboard() {
                 </Table>
             </div>
 
-            <Pagination className="mt-4">
-                <PaginationContent>
-                    <PaginationItem>
-                        <PaginationPrevious onClick={() => handlePageChange(Math.max(1, currentPage - 1))} />
-                    </PaginationItem>
-                    {[...Array(Math.ceil(displayData.length / itemsPerPage))].map((_, index) => (
-                        <PaginationItem key={index}>
-                            <PaginationLink
-                                onClick={() => handlePageChange(index + 1)}
-                                isActive={index + 1 === currentPage}
-                            >
-                                {index + 1}
-                            </PaginationLink>
-                        </PaginationItem>
-                    ))}
-                    <PaginationItem>
-                        <PaginationNext onClick={() => handlePageChange(Math.min(Math.ceil(displayData.length / itemsPerPage), currentPage + 1))} />
-                    </PaginationItem>
-                </PaginationContent>
-            </Pagination>
+            <div className="mt-4 flex justify-center space-x-2">
+                <Button onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1}>
+                    Previous
+                </Button>
+                {Array.from({ length: Math.ceil(displayData.length / itemsPerPage) }).map((_, index) => (
+                    <Button
+                        key={index}
+                        variant={currentPage === index + 1 ? "default" : "outline"}
+                        onClick={() => paginate(index + 1)}
+                    >
+                        {index + 1}
+                    </Button>
+                ))}
+                <Button
+                    onClick={() => paginate(currentPage + 1)}
+                    disabled={currentPage === Math.ceil(displayData.length / itemsPerPage)}
+                >
+                    Next
+                </Button>
+            </div>
         </div>
     )
 }
