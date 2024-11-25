@@ -62,7 +62,7 @@ export default function UserDashboard() {
     const [currentPage, setCurrentPage] = useState(1)
     const [isAuthenticated, setIsAuthenticated] = useState(false)
     const [isAdmin, setIsAdmin] = useState(false)
-    const [itemsPerPage] = useState(10)
+    const [itemsPerPage] = useState(5)
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false);
     const [filters, setFilters] = useState({
@@ -184,8 +184,8 @@ export default function UserDashboard() {
             const items = await filterDataForPDF(gstin);
             console.log("items : ", items);
     
-            if (!items) {
-                console.error("No data found for the provided GSTIN");
+            if (!Array.isArray(items) || items.length === 0) {
+                console.error("No data found for the provided GSTIN or array is empty");
                 return;
             }
     
@@ -195,12 +195,12 @@ export default function UserDashboard() {
             doc.setFontSize(10);
     
             const summaryTableData = [
-                ['GSTIN', items.gstin || 'N/A', 'STATUS', items.return_status || 'N/A'],
-                ['LEGAL NAME', items.legal_name || 'N/A', 'REG. DATE', items.registration_date || 'N/A'],
-                ['TRADE NAME', items.trade_name || 'N/A', 'LAST UPDATE DATE', items.last_update || 'N/A'],
-                ['COMPANY TYPE', items.company_type || 'N/A', 'STATE', items.state || 'N/A'],
-                ['% DELAYED FILLING', items.delayed_filling || 'N/A', 'AVG. DELAY DAYS', items.Delay_days || 'N/A'],
-                ['Address', items.address || 'N/A', 'Result', items.result || 'N/A'],
+                ['GSTIN', items[0].gstin || 'N/A', 'STATUS', items[0].return_status || 'N/A'],
+                ['LEGAL NAME', items[0].legal_name || 'N/A', 'REG. DATE', items[0].registration_date || 'N/A'],
+                ['TRADE NAME', items[0].trade_name || 'N/A', 'LAST UPDATE DATE', items[0].last_update || 'N/A'],
+                ['COMPANY TYPE', items[0].company_type || 'N/A', 'STATE', items[0].state || 'N/A'],
+                ['% DELAYED FILLING', items[0].delayed_filling || 'N/A', 'AVG. DELAY DAYS', items[0].Delay_days || 'N/A'],
+                ['Address', items[0].state || 'N/A', 'Result', items[0].result || 'N/A'],
             ];
     
             doc.autoTable({
@@ -215,16 +215,38 @@ export default function UserDashboard() {
     
             const yPos = doc.lastAutoTable?.finalY ? doc.lastAutoTable.finalY + 10 : 20;
     
-            const filingDetails: string[][] = [
-                [
-                    items.year || 'N/A',
-                    items.month || 'N/A',
-                    items.return_type || 'N/A',
-                    items.date_of_filing || 'N/A',
-                    items.delayed_filling || 'N/A',
-                    items.Delay_days || 'N/A'
-                ]
-            ];
+            const filingDetails: string[][] = [];
+            items.forEach((item) => {
+                if (item) {
+                    filingDetails.push([
+                        item.year || 'N/A',
+                        item.month || 'N/A',
+                        item.return_type || 'N/A',
+                        item.date_of_filing || 'N/A',
+                        item.delayed_filling || 'N/A',
+                        item.Delay_days || 'N/A'
+                    ]);
+                }
+            });
+    
+            filingDetails.sort((a, b) => {
+                const yearA = parseInt(a[0], 10);
+                const yearB = parseInt(b[0], 10);
+                const monthA = parseInt(a[1], 10);
+                const monthB = parseInt(b[1], 10);
+    
+                if (yearA > yearB) return -1;
+                if (yearA < yearB) return 1;
+    
+                if (monthA > monthB) return -1;
+                if (monthA < monthB) return 1;
+    
+                return 0;
+            });
+    
+            if (filingDetails.length > 24) {
+                filingDetails.splice(24);
+            }
     
             const sortedFilingDetails = filingDetails.map(item => [
                 item[0],
