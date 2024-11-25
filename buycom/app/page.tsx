@@ -21,6 +21,10 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!username || !password) {
+      alert("All fields are required.");
+      return;
+    }
     setLoading(true) // Start loading
 
     const encodedCredentials = btoa(`${username}:${password}`)
