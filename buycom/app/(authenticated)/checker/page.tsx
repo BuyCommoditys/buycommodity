@@ -12,6 +12,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
 import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
@@ -34,6 +41,7 @@ declare module 'jspdf' {
         };
     }
 }
+
 
 interface Company {
     id?: number;
@@ -62,8 +70,11 @@ export default function UserDashboard() {
     const [currentPage, setCurrentPage] = useState(1)
     const [isAuthenticated, setIsAuthenticated] = useState(false)
     const [isAdmin, setIsAdmin] = useState(false)
-    const [itemsPerPage] = useState(10)
+    const [itemsPerPage] = useState(5)
+    const [editingId, setEditingId] = useState<number | null>(null)
     const router = useRouter()
+    const [error, setError] = useState('');
+    const [newStatus, setNewStatus] = useState<string>('')
     const [isLoading, setIsLoading] = useState(false);
     const [filters, setFilters] = useState({
         legal_name: '',
@@ -152,6 +163,31 @@ export default function UserDashboard() {
     const indexOfFirstItem = indexOfLastItem - itemsPerPage
     const currentItems = displayData.slice(indexOfFirstItem, indexOfLastItem)
 
+    const validateGST = (gstNumber: string) => {
+        // Example GST validation regex for India (15 alphanumeric characters starting with digits, ending with a letter)
+        const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[A-Z0-9]{1}[Z]{1}[A-Z0-9]{1}$/i;
+        return gstRegex.test(gstNumber);
+    };
+
+    const handleSubmit = (e: { preventDefault: () => void }) => {
+        e.preventDefault();
+        setError(''); // Clear any previous errors
+
+        if (!searchQuery) {
+            setError('GST Number is required.');
+            return;
+        }
+
+        if (!validateGST(searchQuery)) {
+            setError('Invalid GST Number. Please enter a valid GSTIN.');
+            return;
+        }
+
+        // If validation passes, proceed with the search
+        console.log('Valid GST Number:', searchQuery);
+        alert(`Searching for GST Number: ${searchQuery}`);
+    };
+
     const filterDataForPDF = async (gstin: string): Promise<Company | null> => {
         try {
             const response = await fetch(`${API_URL}/companies/${gstin}/`)
@@ -178,73 +214,181 @@ export default function UserDashboard() {
         return months[monthIndex] || 'N/A';
     };
 
+    const handleSaveChanges = async () => {
+        if (editingId !== null) {
+            const selectedItem = allData.find(item => item.id === editingId);
+            if (!selectedItem) {
+                console.error("Selected item not found");
+                return;
+            }
+
+            const bodyData = {
+                id: editingId,
+                gstin: selectedItem.gstin,
+                status: newStatus || selectedItem.result,
+                // annual_turnover: newAnnualTurnover ? parseFloat(newAnnualTurnover) : selectedItem.annual_turnover,
+            };
+
+            try {
+                setIsLoading(true);
+                const response = await fetch(`${API_URL}/update_status_for_gstin/`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(bodyData),
+                });
+
+                if (response.ok) {
+                    console.log("Record updated successfully");
+                    await fetchData();
+                } else {
+                    console.error("Failed to update record");
+                }
+            } catch (error) {
+                console.error("Error updating record:", error);
+            }
+            setIsLoading(false);
+            setEditingId(null);
+            setNewStatus('');
+            // setNewAnnualTurnover('');
+        }
+    };
+
+    const handleStatusChange = (value: string) => {
+        setNewStatus(value)
+    }
+
+    // Main PDF generation function
     const generatePDF = async (gstin: string) => {
         setIsLoading(true);
         try {
+            // Fetch the filtered data
             const items = await filterDataForPDF(gstin);
-            console.log("items : ", items);
-    
-            if (!items) {
-                console.error("No data found for the provided GSTIN");
+            console.log("items:", items);
+
+            // Check if there are any records
+            if (!Array.isArray(items) || items.length === 0) {
+                console.error("No data found for the provided GSTIN or array is empty");
+                setIsLoading(false);
                 return;
             }
-    
+
+            // Initialize jsPDF
             const doc = new jsPDF();
-            doc.setFontSize(14);
-            doc.text('COMPANY GST3B SUMMARY', 14, 15);
+
+            // Add header text
+            doc.setFontSize(24);
+            doc.text("COMPANY GST3B SUMMARY", 50, 15);
             doc.setFontSize(10);
-    
+
+            // Add summary data as a table
             const summaryTableData = [
-                ['GSTIN', items.gstin || 'N/A', 'STATUS', items.return_status || 'N/A'],
-                ['LEGAL NAME', items.legal_name || 'N/A', 'REG. DATE', items.registration_date || 'N/A'],
-                ['TRADE NAME', items.trade_name || 'N/A', 'LAST UPDATE DATE', items.last_update || 'N/A'],
-                ['COMPANY TYPE', items.company_type || 'N/A', 'STATE', items.state || 'N/A'],
-                ['% DELAYED FILLING', items.delayed_filling || 'N/A', 'AVG. DELAY DAYS', items.Delay_days || 'N/A'],
-                ['Address', items.address || 'N/A', 'Result', items.result || 'N/A'],
+                ["GSTIN", items[0].gstin || "N/A", "STATUS", items[0].return_status || "N/A"],
+                ["LEGAL NAME", items[0].legal_name || "N/A", "REG. DATE", items[0].registration_date || "N/A"],
+                ["TRADE NAME", items[0].trade_name || "N/A", "LAST UPDATE DATE", items[0].last_update || "N/A"],
+                ["COMPANY TYPE", items[0].company_type || "N/A", "STATE", items[0].state || "N/A"],
+                ["% DELAYED FILLING", items[0].delayed_filling || "N/A", "AVG. DELAY DAYS", items[0].Delay_days || "N/A"],
+                ["Address", items[0].address || "N/A", "Result", items[0].result || "N/A"],
             ];
-    
+
             doc.autoTable({
                 startY: 20,
-                head: [['', '', '', '']],
+                head: [["", "", "", ""]],
                 body: summaryTableData,
-                theme: 'grid',
+                theme: "grid",
                 headStyles: { fillColor: [230, 230, 230] },
                 styles: { fontSize: 10, cellPadding: 3, textColor: [0, 0, 0] },
                 columnStyles: { 0: { cellWidth: 45 }, 1: { cellWidth: 70 }, 2: { cellWidth: 45 }, 3: { cellWidth: 30 } },
             });
-    
-            const yPos = doc.lastAutoTable?.finalY ? doc.lastAutoTable.finalY + 10 : 20;
-    
-            const filingDetails: string[][] = [
-                [
-                    items.year || 'N/A',
-                    items.month || 'N/A',
-                    items.return_type || 'N/A',
-                    items.date_of_filing || 'N/A',
-                    items.delayed_filling || 'N/A',
-                    items.Delay_days || 'N/A'
-                ]
-            ];
-    
-            const sortedFilingDetails = filingDetails.map(item => [
-                item[0],
-                getMonthName(item[1]),
-                item[2],
-                item[3],
-                item[4],
-                item[5]
-            ]);
-    
-            doc.autoTable({
-                startY: yPos,
-                head: [['Year', 'Month', 'Return Type', 'Date of Filing', 'Delayed Filing', 'Delay Days']],
-                body: sortedFilingDetails,
-                theme: 'grid',
-                headStyles: { fillColor: [230, 230, 230] },
-                styles: { fontSize: 10, cellPadding: 3, textColor: [0, 0, 0] },
-                columnStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 30 }, 2: { cellWidth: 30 }, 3: { cellWidth: 30 }, 4: { cellWidth: 35 }, 5: { cellWidth: 30 } },
+
+            // Get the Y position for the next table
+            let yPos = doc.lastAutoTable?.finalY ? doc.lastAutoTable.finalY + 10 : 20;
+
+            // Sorting logic for all items
+            items.sort((a, b) => {
+                const yearA = parseInt(a.year || "0", 10);
+                const yearB = parseInt(b.year || "0", 10);
+                const monthA = parseInt(a.month || "0", 10);
+                const monthB = parseInt(b.month || "0", 10);
+
+                if (yearA > yearB) return -1;
+                if (yearA < yearB) return 1;
+                if (monthA > monthB) return -1;
+                if (monthA < monthB) return 1;
+
+                return 0;
             });
-    
+
+            if (items.length > 24) {
+                items.splice(24);
+            }
+            // Prepare sorted data for tables
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const prepareTableData = (records: any[]) =>
+                records.map((item) => [
+                    item.year || "N/A",
+                    getMonthName(item.month || "N/A"),
+                    item.return_type || "N/A",
+                    item.date_of_filing || "N/A",
+                    item.delayed_filling || "N/A",
+                    item.Delay_days || "N/A",
+                ]);
+
+            // Separate GSTR3B and other records
+            const gstr3bRecords = items.filter((item) => item.return_type === "GSTR3B");
+            const otherRecords = items.filter((item) => item.return_type !== "GSTR3B");
+
+            // Prepare table data
+            const gstr3bTableData = prepareTableData(gstr3bRecords);
+            const otherTableData = prepareTableData(otherRecords);
+
+            // Add GSTR3B records table
+            if (gstr3bTableData.length > 0) {
+                doc.autoTable({
+                    startY: yPos,
+                    head: [["Year", "Month", "Return Type", "Date of Filing", "Delayed Filing", "Delay Days"]],
+                    body: gstr3bTableData,
+                    theme: "grid",
+                    headStyles: { fillColor: [230, 230, 230] },
+                    styles: { fontSize: 10, cellPadding: 3, textColor: [0, 0, 0] },
+                    columnStyles: {
+                        0: { cellWidth: 30 },
+                        1: { cellWidth: 30 },
+                        2: { cellWidth: 30 },
+                        3: { cellWidth: 35 },
+                        4: { cellWidth: 35 },
+                        5: { cellWidth: 30 },
+                    },
+                });
+                // yPos = doc.lastAutoTable.finalY + 20;
+                yPos = doc.lastAutoTable?.finalY ? doc.lastAutoTable.finalY + 20 : 30;
+
+            }
+
+            // Add Other records table
+            if (otherTableData.length > 0) {
+                doc.setFontSize(24);
+                doc.text("Other Records", 80, yPos - 5);
+                doc.autoTable({
+                    startY: yPos,
+                    head: [["Year", "Month", "Return Type", "Date of Filing", "Delayed Filing", "Delay Days"]],
+                    body: otherTableData,
+                    theme: "grid",
+                    headStyles: { fillColor: [230, 230, 230] },
+                    styles: { fontSize: 10, cellPadding: 3, textColor: [0, 0, 0] },
+                    columnStyles: {
+                        0: { cellWidth: 30 },
+                        1: { cellWidth: 30 },
+                        2: { cellWidth: 30 },
+                        3: { cellWidth: 35 },
+                        4: { cellWidth: 35 },
+                        5: { cellWidth: 30 },
+                    },
+                });
+            }
+
+            // Save the PDF
             doc.save(`${gstin}_summary.pdf`);
         } catch (error) {
             console.error("Error generating PDF:", error);
@@ -252,7 +396,7 @@ export default function UserDashboard() {
             setIsLoading(false);
         }
     };
-    
+
     const handleSort = (key: keyof Company) => {
         setSortConfig(prevConfig => {
             if (!prevConfig || prevConfig.key !== key) {
@@ -271,16 +415,26 @@ export default function UserDashboard() {
 
     return (
         <div className="container mx-auto px-4 py-8">
-            <form onSubmit={(e) => e.preventDefault()} className="flex space-x-4 mb-6">
-                <Input
-                    type="text"
-                    placeholder="Enter GST Number"
-                    className="flex-grow"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <Button type="submit">Search</Button>
+            <form onSubmit={handleSubmit} className="flex flex-col space-y-4 mb-6">
+                <div className="flex space-x-4">
+                    <input
+                        type="text"
+                        placeholder="Enter GST Number"
+                        className={`flex-grow p-2 border ${error ? 'border-red-500' : 'border-gray-300'
+                            } rounded-md`}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    <button
+                        type="submit"
+                        className="bg-[#0f172b] text-white px-4 py-2 rounded-md hover:bg-#0f172b"
+                    >
+                        Search
+                    </button>
+                </div>
+                {error && <p className="text-red-500 text-sm">{error}</p>}
             </form>
+
 
             <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Input
@@ -353,7 +507,7 @@ export default function UserDashboard() {
                             <TableHead onClick={() => handleSort('Delay_days')} className="
 cursor-pointer">
                                 <div className="flex items-center">
-                                    Delay Days
+                                    Delay Days %
                                     {sortConfig?.key === 'Delay_days'
                                         ? (sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />)
                                         : <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -389,17 +543,52 @@ cursor-pointer">
                                 <TableCell>{item.state}</TableCell>
                                 <TableCell>{item.fetch_date}</TableCell>
                                 <TableCell>{item.Delay_days}</TableCell>
-                                <TableCell>{item.delayed_filling}%</TableCell>
+                                <TableCell>{item.delayed_filling}</TableCell>
                                 <TableCell>{item.result}</TableCell>
                                 <TableCell>
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm" 
-                                        onClick={() => generatePDF(item.gstin || '')} 
-                                        disabled={isLoading}
-                                    >
-                                        {isLoading ? 'Loading...' : 'Download'}
+                                    <Button variant="outline" size="sm" onClick={() => generatePDF(item.gstin || '')} className="mr-2" type="submit" disabled={isLoading}>
+                                        {isLoading ? (
+                                            <img src="/gif/loading.gif" alt="Loading..." className="w-16 h-6" />
+                                        ) : (
+                                            "Download"
+                                        )}
                                     </Button>
+                                    <Dialog>
+                                        <DialogTrigger asChild>
+                                            <Button variant="outline" onClick={() => setEditingId(item.id || null)} size="sm">Edit</Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="sm:max-w-[425px]">
+                                            <DialogHeader>
+                                                <DialogTitle>Edit Company Details</DialogTitle>
+                                            </DialogHeader>
+                                            <div className="grid gap-4 py-4">
+                                                <div className="grid grid-cols-4 items-center gap-4">
+                                                    <label htmlFor="status" className="text-right">
+                                                        Status
+                                                    </label>
+                                                    <Select onValueChange={handleStatusChange} defaultValue={item.result}>
+                                                        <SelectTrigger className="col-span-3">
+                                                            <SelectValue placeholder="Select status" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="Pass">Pass</SelectItem>
+                                                            <SelectItem value="Fail">Fail</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+
+                                            </div>
+                                            <div className="flex justify-end space-x-4">
+                                                <Button type="submit" disabled={isLoading} onClick={handleSaveChanges}>
+                                                    {isLoading ? (
+                                                        <img src="/gif/loading.gif" alt="Loading..." className="w-6 h-6" />
+                                                    ) : (
+                                                        "Save Changes"
+                                                    )}
+                                                </Button>
+                                            </div>
+                                        </DialogContent>
+                                    </Dialog>
                                 </TableCell>
                             </TableRow>
                         ))}

@@ -18,6 +18,8 @@ urlpatterns = [
     path('companies/<str:gstin>/', CompanyDetailView.as_view(), name='company-detail'),
     path('api-token-auth/', obtain_auth_token, name='api_token_auth'),
     path('update_gst_record/', views.update_gst_record, name='update_gst_record'),
+    path('update_annual_turnover/', views.update_annual_turnover_and_status, name='update_annual_turnover_and_status'),
+    path('update_status_for_gstin/', views.update_status_for_gstin, name='update_status_for_gstin'),
     path('fetch_and_save_gst_record/', views.fetch_and_save_gst_record, name='fetch_and_save_gst_record'),
     path('', include(router.urls)), 
 ]

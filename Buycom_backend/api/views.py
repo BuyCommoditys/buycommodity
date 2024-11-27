@@ -311,12 +311,15 @@ def update_gst_record(request):
                     )
                 )["avg_delay"] or 0
 
-                long_delays = past_year_records.filter(Delay_days__gt="15").count()
-
+                # long_delays = past_year_records.filter(Delay_days__gt="15").count()
+                long_delays = past_year_records.annotate(
+                    delay_days_int=Cast('Delay_days', IntegerField())
+                ).filter(delay_days_int__gt=15).count()
+                print("long_delays : ", long_delays)
                 immediate_past_month = (datetime.now().replace(day=1) - timedelta(days=1)).month
 
                 result = "Pass" if (
-                    avg_delay <= 7 and long_delays <= 1 and
+                    avg_delay <= 7 and long_delays <= 3 and
                     all(
                         datetime.strptime(past_record.date_of_filing, "%d-%m-%Y").month != immediate_past_month
                         for past_record in past_year_records
@@ -340,6 +343,112 @@ def update_gst_record(request):
 
     return Response({"message": "GST records updated successfully."})
 
+
+@api_view(['PUT'])
+def update_annual_turnover_and_status(request):
+    gstin = request.data.get('gstin')
+    annual_turnover = request.data.get('annual_turnover')
+
+    if not gstin:
+        return Response({"error": "GSTIN is required."}, status=400)
+
+    records = CompanyGSTRecord.objects.filter(gstin=gstin)
+
+    if not records.exists():
+        return Response({"message": "No applicable records found."}, status=404)
+
+    if annual_turnover == "" or annual_turnover is None:
+        annual_turnover = None
+    else:
+        try:
+            annual_turnover = int(annual_turnover)
+        except ValueError:
+            return Response({"error": "Invalid annual_turnover value."}, status=400)
+
+    def determine_due_date(return_type, state, annual_turnover):
+        if return_type == "GSTR3B":
+            if annual_turnover is None or annual_turnover > 5_00_00_000:
+                return 20
+            elif state in [
+                "Chhattisgarh", "Madhya Pradesh", "Gujarat", "Daman and Diu",
+                "Dadra and Nagar Haveli", "Maharashtra", "Karnataka", "Goa",
+                "Lakshadweep", "Kerala", "Tamil Nadu", "Puducherry",
+                "Andaman and Nicobar Islands", "Telangana", "Andhra Pradesh"
+            ]:
+                return 22
+            else:
+                return 24
+        elif return_type == "GSTR1":
+            return 11
+        else:
+            return 13
+
+    for record in records:
+        if annual_turnover is not None and record.annual_turnover != annual_turnover:
+            record.annual_turnover = annual_turnover
+
+            due_day = determine_due_date(record.return_type, record.state, annual_turnover)
+            filing_date = datetime.strptime(record.date_of_filing, "%d-%m-%Y")
+            due_date = filing_date.replace(day=due_day)
+
+            delayed_filling = "Yes" if filing_date > due_date else "No"
+            delay_days = (filing_date - due_date).days if delayed_filling == "Yes" else 0
+
+            record.delayed_filling = delayed_filling
+            record.Delay_days = str(delay_days)
+
+            past_year_records = CompanyGSTRecord.objects.filter(
+                gstin=gstin,
+                date_of_filing__gte=datetime.now() - timedelta(days=365)
+            )
+
+            avg_delay = past_year_records.aggregate(
+                avg_delay=Avg(
+                    Case(
+                        When(Delay_days__regex=r"^\d+$", then=Cast("Delay_days", IntegerField())),
+                        default=Value(0),
+                        output_field=IntegerField(),
+                    )
+                )
+            )["avg_delay"] or 0
+
+            long_delays = past_year_records.annotate(
+                delay_days_int=Cast('Delay_days', IntegerField())
+            ).filter(delay_days_int__gt=15).count()
+
+            immediate_past_month = (datetime.now().replace(day=1) - timedelta(days=1)).month
+            result = "Pass" if (
+                avg_delay <= 7 and long_delays <= 3 and
+                all(
+                    datetime.strptime(past_record.date_of_filing, "%d-%m-%Y").month != immediate_past_month
+                    for past_record in past_year_records
+                )
+            ) else "Fail"
+
+            record.result = result
+            record.save()
+
+    return Response({"message": "Annual turnover and status updated successfully."})
+
+
+@api_view(['PUT'])
+def update_status_for_gstin(request):
+    gstin = request.data.get('gstin')
+    status = request.data.get('status')
+
+    if not gstin or not status:
+        return Response({"error": "GSTIN and status are required."}, status=400)
+
+    records = CompanyGSTRecord.objects.filter(gstin=gstin)
+
+    if not records.exists():
+        return Response({"message": "No records found for the given GSTIN."}, status=404)
+
+    for record in records:
+        record.result = status
+        record.save()
+
+    return Response({"message": "Status updated successfully."})
 
 
 class LoginViewSet(viewsets.ModelViewSet):

@@ -19,14 +19,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import {
-    Pagination,
-    PaginationContent,
-    PaginationItem,
-    PaginationLink,
-    PaginationNext,
-    PaginationPrevious,
-} from "@/components/ui/pagination"
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
 import API_URL from '@/config'
@@ -83,6 +75,7 @@ export default function AdminDashboard() {
     const [isAuthenticated, setIsAuthenticated] = useState(false)
     const [isAdmin, setIsAdmin] = useState(false)
     const router = useRouter()
+    const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [filters, setFilters] = useState({
         legal_name: '',
@@ -149,34 +142,53 @@ export default function AdminDashboard() {
         }
     }
 
+    const validateGST = (gstin: string) => {
+        // Example GST validation regex for India (15 alphanumeric characters starting with digits, ending with a letter)
+        const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[A-Z0-9]{1}[Z]{1}[A-Z0-9]{1}$/i;
+        return gstRegex.test(gstin);
+    };
+
     const handleSearch = async (e: React.FormEvent) => {
-        e.preventDefault()
+        e.preventDefault();
+        setError(""); // Clear any previous errors
+
+        if (!searchQuery) {
+            setError("GST Number is required.");
+            return;
+        }
+
+        if (!validateGST(searchQuery.trim())) {
+            setError("Invalid GSTIN. Please enter a valid GSTIN.");
+            return;
+        }
+
         setIsLoading(true);
         try {
             const response = await fetch(`${API_URL}/fetch_and_save_gst_record/`, {
-                method: 'POST',
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json',
+                    "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ gstin: searchQuery })
+                body: JSON.stringify({ gstin: searchQuery }),
             });
 
             if (response.ok) {
                 console.log("Record updated successfully");
-
-                setTimeout(fetchData, 1000);
-                setIsLoading(false);
+                setTimeout(() => fetchData(), 1000);
             } else {
                 console.error("Failed to update record");
             }
         } catch (error) {
-            console.error("Error fetching company details:", error)
+            console.error("Error fetching company details:", error);
+        } finally {
+            setIsLoading(false);
         }
-    }
+    };
 
-    const handleStatusChange = (value: string) => {
-        setNewStatus(value)
-    }
+
+    // const handleStatusChange = (value: string) => {
+    //     setNewStatus(value)
+    // }
 
     const handleAnnualTurnoverChange = (value: string) => {
         setNewAnnualTurnover(value)
@@ -256,92 +268,132 @@ export default function AdminDashboard() {
     const generatePDF = async (gstin: string) => {
         setIsLoading(true);
         try {
+            // Fetch the filtered data
             const items = await filterDataForPDF(gstin);
-            console.log("items : ", items);
-    
+            console.log("items:", items);
+
+            // Check if there are any records
             if (!Array.isArray(items) || items.length === 0) {
                 console.error("No data found for the provided GSTIN or array is empty");
+                setIsLoading(false);
                 return;
             }
-    
+
+            // Initialize jsPDF
             const doc = new jsPDF();
-            doc.setFontSize(14);
-            doc.text('COMPANY GST3B SUMMARY', 14, 15);
+
+            // Add header text
+            doc.setFontSize(24);
+            doc.text("COMPANY GST3B SUMMARY", 50, 15);
             doc.setFontSize(10);
-    
+
+            // Add summary data as a table
             const summaryTableData = [
-                ['GSTIN', items[0].gstin || 'N/A', 'STATUS', items[0].return_status || 'N/A'],
-                ['LEGAL NAME', items[0].legal_name || 'N/A', 'REG. DATE', items[0].registration_date || 'N/A'],
-                ['TRADE NAME', items[0].trade_name || 'N/A', 'LAST UPDATE DATE', items[0].last_update || 'N/A'],
-                ['COMPANY TYPE', items[0].company_type || 'N/A', 'STATE', items[0].state || 'N/A'],
-                ['% DELAYED FILLING', items[0].delayed_filling || 'N/A', 'AVG. DELAY DAYS', items[0].Delay_days || 'N/A'],
-                ['Address', items[0].address || 'N/A', 'Result', items[0].result || 'N/A'],
+                ["GSTIN", items[0].gstin || "N/A", "STATUS", items[0].return_status || "N/A"],
+                ["LEGAL NAME", items[0].legal_name || "N/A", "REG. DATE", items[0].registration_date || "N/A"],
+                ["TRADE NAME", items[0].trade_name || "N/A", "LAST UPDATE DATE", items[0].last_update || "N/A"],
+                ["COMPANY TYPE", items[0].company_type || "N/A", "STATE", items[0].state || "N/A"],
+                ["% DELAYED FILLING", items[0].delayed_filling || "N/A", "AVG. DELAY DAYS", items[0].Delay_days || "N/A"],
+                ["Address", items[0].address || "N/A", "Result", items[0].result || "N/A"],
             ];
-    
+
             doc.autoTable({
                 startY: 20,
-                head: [['', '', '', '']],
+                head: [["", "", "", ""]],
                 body: summaryTableData,
-                theme: 'grid',
+                theme: "grid",
                 headStyles: { fillColor: [230, 230, 230] },
                 styles: { fontSize: 10, cellPadding: 3, textColor: [0, 0, 0] },
                 columnStyles: { 0: { cellWidth: 45 }, 1: { cellWidth: 70 }, 2: { cellWidth: 45 }, 3: { cellWidth: 30 } },
             });
-    
-            const yPos = doc.lastAutoTable?.finalY ? doc.lastAutoTable.finalY + 10 : 20;
-    
-            const filingDetails: string[][] = [];
-            items.forEach((item) => {
-                if (item) {
-                    filingDetails.push([
-                        item.year || 'N/A',
-                        item.month || 'N/A',
-                        item.return_type || 'N/A',
-                        item.date_of_filing || 'N/A',
-                        item.delayed_filling || 'N/A',
-                        item.Delay_days || 'N/A'
-                    ]);
-                }
-            });
-    
-            filingDetails.sort((a, b) => {
-                const yearA = parseInt(a[0], 10);
-                const yearB = parseInt(b[0], 10);
-                const monthA = parseInt(a[1], 10);
-                const monthB = parseInt(b[1], 10);
-    
+
+            // Get the Y position for the next table
+            let yPos = doc.lastAutoTable?.finalY ? doc.lastAutoTable.finalY + 10 : 20;
+
+            // Sorting logic for all items
+            items.sort((a, b) => {
+                const yearA = parseInt(a.year || "0", 10);
+                const yearB = parseInt(b.year || "0", 10);
+                const monthA = parseInt(a.month || "0", 10);
+                const monthB = parseInt(b.month || "0", 10);
+
                 if (yearA > yearB) return -1;
                 if (yearA < yearB) return 1;
-    
                 if (monthA > monthB) return -1;
                 if (monthA < monthB) return 1;
-    
+
                 return 0;
             });
-    
-            if (filingDetails.length > 24) {
-                filingDetails.splice(24);
+
+            if (items.length > 24) {
+                items.splice(24);
             }
-    
-            const sortedFilingDetails = filingDetails.map(item => [
-                item[0],
-                getMonthName(item[1]),
-                item[2],
-                item[3],
-                item[4],
-                item[5]
-            ]);
-    
-            doc.autoTable({
-                startY: yPos,
-                head: [['Year', 'Month', 'Return Type', 'Date of Filing', 'Delayed Filing', 'Delay Days']],
-                body: sortedFilingDetails,
-                theme: 'grid',
-                headStyles: { fillColor: [230, 230, 230] },
-                styles: { fontSize: 10, cellPadding: 3, textColor: [0, 0, 0] },
-                columnStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 30 }, 2: { cellWidth: 30 }, 3: { cellWidth: 30 }, 4: { cellWidth: 35 }, 5: { cellWidth: 30 } },
-            });
-    
+            // Prepare sorted data for tables
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const prepareTableData = (records: any[]) =>
+                records.map((item) => [
+                    item.year || "N/A",
+                    getMonthName(item.month || "N/A"),
+                    item.return_type || "N/A",
+                    item.date_of_filing || "N/A",
+                    item.delayed_filling || "N/A",
+                    item.Delay_days || "N/A",
+                ]);
+
+            // Separate GSTR3B and other records
+            const gstr3bRecords = items.filter((item) => item.return_type === "GSTR3B");
+            const otherRecords = items.filter((item) => item.return_type !== "GSTR3B");
+
+            // Prepare table data
+            const gstr3bTableData = prepareTableData(gstr3bRecords);
+            const otherTableData = prepareTableData(otherRecords);
+
+            // Add GSTR3B records table
+            if (gstr3bTableData.length > 0) {
+                doc.autoTable({
+                    startY: yPos,
+                    head: [["Year", "Month", "Return Type", "Date of Filing", "Delayed Filing", "Delay Days"]],
+                    body: gstr3bTableData,
+                    theme: "grid",
+                    headStyles: { fillColor: [230, 230, 230] },
+                    styles: { fontSize: 10, cellPadding: 3, textColor: [0, 0, 0] },
+                    columnStyles: {
+                        0: { cellWidth: 30 },
+                        1: { cellWidth: 30 },
+                        2: { cellWidth: 30 },
+                        3: { cellWidth: 35 },
+                        4: { cellWidth: 35 },
+                        5: { cellWidth: 30 },
+                    },
+                });
+
+                yPos = doc.lastAutoTable?.finalY ? doc.lastAutoTable.finalY + 20 : 30;
+
+            }
+
+            // Add Other records table
+            if (otherTableData.length > 0) {
+                doc.setFontSize(24);
+                doc.text("Other Records", 80, yPos - 5);
+                doc.autoTable({
+                    startY: yPos,
+                    head: [["Year", "Month", "Return Type", "Date of Filing", "Delayed Filing", "Delay Days"]],
+                    body: otherTableData,
+                    theme: "grid",
+                    headStyles: { fillColor: [230, 230, 230] },
+                    styles: { fontSize: 10, cellPadding: 3, textColor: [0, 0, 0] },
+                    columnStyles: {
+                        0: { cellWidth: 30 },
+                        1: { cellWidth: 30 },
+                        2: { cellWidth: 30 },
+                        3: { cellWidth: 35 },
+                        4: { cellWidth: 35 },
+                        5: { cellWidth: 30 },
+                    },
+                });
+            }
+
+            // Save the PDF
             doc.save(`${gstin}_summary.pdf`);
         } catch (error) {
             console.error("Error generating PDF:", error);
@@ -349,11 +401,12 @@ export default function AdminDashboard() {
             setIsLoading(false);
         }
     };
-    
 
-    const handlePageChange = (page: number) => {
-        setCurrentPage(page)
-    }
+    const paginate = (pageNumber: number) => setCurrentPage(pageNumber)
+
+    // const handlePageChange = (page: number) => {
+    //     setCurrentPage(page)
+    // }
 
     const sortData = (data: CompanyData[]) => {
         if (!sortConfig || !sortConfig.key) return data;
@@ -401,7 +454,9 @@ export default function AdminDashboard() {
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Search by GSTIN"
-                            className="flex-grow"
+                            // className="flex-grow"
+                            className={`flex-grow p-2 border ${error ? "border-red-500" : "border-gray-300"
+                                } rounded-md`}
                         />
                         <Button type="submit" disabled={isLoading}>
                             {isLoading ? (
@@ -411,6 +466,7 @@ export default function AdminDashboard() {
                             )}
                         </Button>
                     </div>
+                    {error && <p className="text-red-500 text-sm">{error}</p>}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <Input
                             type="text"
@@ -536,7 +592,7 @@ export default function AdminDashboard() {
                                                     <DialogTitle>Edit Company Details</DialogTitle>
                                                 </DialogHeader>
                                                 <div className="grid gap-4 py-4">
-                                                    <div className="grid grid-cols-4 items-center gap-4">
+                                                    {/* <div className="grid grid-cols-4 items-center gap-4">
                                                         <label htmlFor="status" className="text-right">
                                                             Status
                                                         </label>
@@ -549,7 +605,7 @@ export default function AdminDashboard() {
                                                                 <SelectItem value="Fail">Fail</SelectItem>
                                                             </SelectContent>
                                                         </Select>
-                                                    </div>
+                                                    </div> */}
                                                     <div className="grid grid-cols-4 items-center gap-4">
                                                         <label htmlFor="annual_turnover" className="text-right">
                                                             Annual Turnover (Cr.)
@@ -580,26 +636,26 @@ export default function AdminDashboard() {
                 </Table>
             </div>
 
-            <Pagination className="mt-4">
-                <PaginationContent>
-                    <PaginationItem>
-                        <PaginationPrevious onClick={() => handlePageChange(Math.max(1, currentPage - 1))} />
-                    </PaginationItem>
-                    {[...Array(Math.ceil(displayData.length / itemsPerPage))].map((_, index) => (
-                        <PaginationItem key={index}>
-                            <PaginationLink
-                                onClick={() => handlePageChange(index + 1)}
-                                isActive={index + 1 === currentPage}
-                            >
-                                {index + 1}
-                            </PaginationLink>
-                        </PaginationItem>
-                    ))}
-                    <PaginationItem>
-                        <PaginationNext onClick={() => handlePageChange(Math.min(Math.ceil(displayData.length / itemsPerPage), currentPage + 1))} />
-                    </PaginationItem>
-                </PaginationContent>
-            </Pagination>
+            <div className="mt-4 flex justify-center space-x-2">
+                <Button onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1}>
+                    Previous
+                </Button>
+                {Array.from({ length: Math.ceil(displayData.length / itemsPerPage) }).map((_, index) => (
+                    <Button
+                        key={index}
+                        variant={currentPage === index + 1 ? "default" : "outline"}
+                        onClick={() => paginate(index + 1)}
+                    >
+                        {index + 1}
+                    </Button>
+                ))}
+                <Button
+                    onClick={() => paginate(currentPage + 1)}
+                    disabled={currentPage === Math.ceil(displayData.length / itemsPerPage)}
+                >
+                    Next
+                </Button>
+            </div>
         </div>
     )
 }

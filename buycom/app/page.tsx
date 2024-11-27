@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import API_URL from '@/config'
 
 export default function LoginPage() {
-  const [isAdminLogin, setIsAdminLogin] = useState(false)
+  const [isMakerLogin, setIsMakerLogin] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -21,6 +21,10 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!username || !password) {
+      alert("All fields are required.");
+      return;
+    }
     setLoading(true) // Start loading
 
     const encodedCredentials = btoa(`${username}:${password}`)
@@ -31,7 +35,7 @@ export default function LoginPage() {
           'Content-Type': 'application/json',
           'Authorization': `Basic ${encodedCredentials}`,
         },
-        body: JSON.stringify({ username, password, loginAsAdmin: isAdminLogin }),
+        body: JSON.stringify({ username, password, loginAsMaker: isMakerLogin }),
       })
 
       const data = await response.json()
@@ -42,13 +46,13 @@ export default function LoginPage() {
         const getrole = localStorage.getItem("user_role")
 
         if (data.role === 'admin') {
-          if (isAdminLogin && getrole === "admin") {
-            router.push('/admin')
+          if (isMakerLogin && getrole === "admin") {
+            router.push('/maker')
           } else {
-            router.push('/user')
+            router.push('/checker')
           }
         } else {
-          router.push('/user')
+          router.push('/checker')
         }
       } else {
         alert(data.non_field_errors || 'Invalid credentials')
@@ -69,7 +73,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <Card className="w-[350px]">
         <CardHeader>
-          <CardTitle>{isAdminLogin ? 'Admin Login' : 'User Login'}</CardTitle>
+          <CardTitle>{isMakerLogin ? 'Maker Login' : 'Checker Login'}</CardTitle>
           <CardDescription>Enter your credentials to access the GST Search Portal</CardDescription>
         </CardHeader>
         <CardContent>
@@ -105,10 +109,10 @@ export default function LoginPage() {
           <Button
             variant="outline"
             className="w-full"
-            onClick={() => setIsAdminLogin(!isAdminLogin)}
+            onClick={() => setIsMakerLogin(!isMakerLogin)}
             disabled={loading}
           >
-            {isAdminLogin ? 'Switch to User Login' : 'Login as Admin'}
+            {isMakerLogin ? 'Switch to Checker Login' : 'Login as Maker'}
           </Button>
         </CardFooter>
       </Card>
