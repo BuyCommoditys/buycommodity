@@ -284,7 +284,7 @@ export default function AdminDashboard() {
 
             // Add header text
             doc.setFontSize(24);
-            doc.text("COMPANY GST3B SUMMARY", 50, 15);
+            doc.text("COMPANY GSTR SUMMARY", 50, 15);
             doc.setFontSize(10);
 
             // Add summary data as a table
@@ -350,13 +350,15 @@ export default function AdminDashboard() {
 
             // Add GSTR3B records table
             if (gstr3bTableData.length > 0) {
+
+
                 doc.autoTable({
                     startY: yPos,
                     head: [["Year", "Month", "Return Type", "Date of Filing", "Delayed Filing", "Delay Days"]],
                     body: gstr3bTableData,
                     theme: "grid",
                     headStyles: { fillColor: [230, 230, 230] },
-                    styles: { fontSize: 10, cellPadding: 3, textColor: [0, 0, 0] },
+                    styles: { fontSize: 10, cellPadding: 4.7, textColor: [0, 0, 0] },
                     columnStyles: {
                         0: { cellWidth: 30 },
                         1: { cellWidth: 30 },
