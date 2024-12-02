@@ -7,6 +7,7 @@ from rest_framework import status
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views import View
+from django.db.models import Q
 from rest_framework.views import APIView
 import logging
 from django.contrib.auth.models import User
@@ -107,7 +108,7 @@ def fetch_and_save_gst_record(request):
         start_month += 12
         start_year = current_year - 1
     else:
-        start_year = current_year
+        start_year = current_year - 1
         
     # Get the last two digits of the year
     start_year_short = str(start_year)[2:]
@@ -357,6 +358,8 @@ def update_annual_turnover_and_status(request):
     if not records.exists():
         return Response({"message": "No applicable records found."}, status=404)
 
+    print("annual_turnover :", annual_turnover)
+    print(type(annual_turnover))
     if annual_turnover == "" or annual_turnover is None:
         annual_turnover = None
     else:
@@ -364,7 +367,10 @@ def update_annual_turnover_and_status(request):
             annual_turnover = int(annual_turnover)
         except ValueError:
             return Response({"error": "Invalid annual_turnover value."}, status=400)
-
+    
+    print("annual_turnover2 :", annual_turnover)
+    print(type(annual_turnover))
+    
     def determine_due_date(return_type, state, annual_turnover):
         if return_type == "GSTR3B":
             if annual_turnover is None or annual_turnover > 5_00_00_000:
@@ -382,7 +388,10 @@ def update_annual_turnover_and_status(request):
             return 11
         else:
             return 13
-
+        
+    print("annual_turnover3 :", annual_turnover)
+    print(type(annual_turnover))
+    
     for record in records:
         if annual_turnover is not None and record.annual_turnover != annual_turnover:
             record.annual_turnover = annual_turnover
@@ -395,27 +404,38 @@ def update_annual_turnover_and_status(request):
             delay_days = (filing_date - due_date).days if delayed_filling == "Yes" else 0
 
             record.delayed_filling = delayed_filling
-            record.Delay_days = str(delay_days)
-
+            record.Delay_days = delay_days
+            print("annual_turnover4 :", annual_turnover)
+            print(type(annual_turnover))
             past_year_records = CompanyGSTRecord.objects.filter(
                 gstin=gstin,
                 date_of_filing__gte=datetime.now() - timedelta(days=365)
             )
 
-            avg_delay = past_year_records.aggregate(
-                avg_delay=Avg(
-                    Case(
-                        When(Delay_days__regex=r"^\d+$", then=Cast("Delay_days", IntegerField())),
-                        default=Value(0),
-                        output_field=IntegerField(),
-                    )
-                )
-            )["avg_delay"] or 0
+                        
+            valid_records = past_year_records.filter(
+                ~Q(Delay_days="") & ~Q(Delay_days=None)
+            ).annotate(
+                delay_days_int=Cast("Delay_days", IntegerField())
+            )
 
-            long_delays = past_year_records.annotate(
+            avg_delay = valid_records.aggregate(avg_delay=Avg("delay_days_int"))["avg_delay"] or 0
+
+
+            print("annual_turnover5 :", annual_turnover)
+            print(type(annual_turnover))
+            
+            valid_records = past_year_records.filter(
+                ~Q(Delay_days="") & ~Q(Delay_days=None)
+            )
+
+            # Annotate and filter records with delays greater than 15
+            long_delays = valid_records.annotate(
                 delay_days_int=Cast('Delay_days', IntegerField())
             ).filter(delay_days_int__gt=15).count()
 
+            print("annual_turnover6 :", annual_turnover)
+            print(type(annual_turnover))
             immediate_past_month = (datetime.now().replace(day=1) - timedelta(days=1)).month
             result = "Pass" if (
                 avg_delay <= 7 and long_delays <= 3 and
@@ -424,7 +444,9 @@ def update_annual_turnover_and_status(request):
                     for past_record in past_year_records
                 )
             ) else "Fail"
-
+            
+            print("annual_turnover7 :", annual_turnover)
+            print(type(annual_turnover))
             record.result = result
             record.save()
 
