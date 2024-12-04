@@ -73,7 +73,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <Card className="w-[350px]">
         <CardHeader>
-          <CardTitle>{isMakerLogin ? 'Maker Login' : 'Checker Login'}</CardTitle>
+          <CardTitle className='text-center'>BuyCommodity</CardTitle>
+          <CardTitle className='text-center'>{isMakerLogin ? 'Maker Login' : 'Checker Login'}</CardTitle>
           <CardDescription>Enter your credentials to access the GST Search Portal</CardDescription>
         </CardHeader>
         <CardContent>
