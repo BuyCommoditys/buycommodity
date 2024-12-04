@@ -294,7 +294,7 @@ export default function AdminDashboard() {
                 ["TRADE NAME", items[0].trade_name || "N/A", "LAST UPDATE DATE", items[0].last_update || "N/A"],
                 ["COMPANY TYPE", items[0].company_type || "N/A", "STATE", items[0].state || "N/A"],
                 ["% DELAYED FILLING", items[0].delayed_filling || "N/A", "AVG. DELAY DAYS", items[0].Delay_days || "N/A"],
-                ["Address", items[0].address || "N/A", "Result", items[0].result || "N/A"],
+                ["Address", items[0].state || "N/A", "Result", items[0].result || "N/A"],
             ];
 
             doc.autoTable({
