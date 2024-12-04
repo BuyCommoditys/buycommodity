@@ -68,7 +68,6 @@ export default function AdminDashboard() {
     const [allData, setAllData] = useState<CompanyData[]>([])
     const [displayData, setDisplayData] = useState<CompanyData[]>([])
     const [editingId, setEditingId] = useState<number | null>(null)
-    const [newStatus, setNewStatus] = useState<string>('')
     const [newAnnualTurnover, setNewAnnualTurnover] = useState<string>('')
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage] = useState(5)
@@ -176,12 +175,13 @@ export default function AdminDashboard() {
                 console.log("Record updated successfully");
                 setTimeout(() => fetchData(), 1000);
             } else {
-                console.error("Failed to update record");
+                console.error("Failed to updating record");
             }
         } catch (error) {
             console.error("Error fetching company details:", error);
         } finally {
             setIsLoading(false);
+            setSearchQuery("");
         }
     };
 
@@ -205,13 +205,13 @@ export default function AdminDashboard() {
             const bodyData = {
                 id: editingId,
                 gstin: selectedItem.gstin,
-                status: newStatus || selectedItem.result,
+                // status: newStatus || selectedItem.result,
                 annual_turnover: newAnnualTurnover ? parseFloat(newAnnualTurnover) : selectedItem.annual_turnover,
             };
 
             try {
                 setIsLoading(true);
-                const response = await fetch(`${API_URL}/update_gst_record/`, {
+                const response = await fetch(`${API_URL}/update_annual_turnover/`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -223,14 +223,13 @@ export default function AdminDashboard() {
                     console.log("Record updated successfully");
                     await fetchData();
                 } else {
-                    console.error("Failed to update record");
+                    console.error("Failed to updating record");
                 }
             } catch (error) {
                 console.error("Error updating record:", error);
             }
             setIsLoading(false);
             setEditingId(null);
-            setNewStatus('');
             setNewAnnualTurnover('');
         }
     };
@@ -294,7 +293,7 @@ export default function AdminDashboard() {
                 ["TRADE NAME", items[0].trade_name || "N/A", "LAST UPDATE DATE", items[0].last_update || "N/A"],
                 ["COMPANY TYPE", items[0].company_type || "N/A", "STATE", items[0].state || "N/A"],
                 ["% DELAYED FILLING", items[0].delayed_filling || "N/A", "AVG. DELAY DAYS", items[0].Delay_days || "N/A"],
-                ["Address", items[0].state || "N/A", "Result", items[0].result || "N/A"],
+                ["Address", items[0].address || "N/A", "Result", items[0].result || "N/A"],
             ];
 
             doc.autoTable({
@@ -464,7 +463,7 @@ export default function AdminDashboard() {
                             {isLoading ? (
                                 <img src="/gif/loading.gif" alt="Loading..." className="w-6 h-6" />
                             ) : (
-                                "Add Company"
+                                "Add/update Company"
                             )}
                         </Button>
                     </div>
