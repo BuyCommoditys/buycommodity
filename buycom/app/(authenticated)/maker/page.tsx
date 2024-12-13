@@ -293,7 +293,7 @@ export default function AdminDashboard() {
             doc.setFont('bold');
             doc.text("Customer Due Diligence Report", 50, 15);
             doc.setLineWidth(0.5);
-            doc.line(50, 18, 150, 18);
+            doc.line(50, 22, 150, 18);
             // Set font size for the rest of the content
             doc.setFontSize(10);
 
