@@ -586,7 +586,7 @@ export default function AdminDashboard() {
                                     <TableCell>{item.state || ''}</TableCell>
                                     <TableCell>{item.fetch_date}</TableCell>
                                     <TableCell>{item.annual_turnover || ''}</TableCell>
-                                    <TableCell>{item.result || ''}</TableCell>
+                                    <TableCell>{item.result || 'Hold'}</TableCell>
                                     <TableCell>
                                         <Button variant="outline" size="sm" onClick={() => generatePDF(item.gstin || '')} className="mr-2" type="submit" disabled={isLoading}>
                                             {isLoading ? (
