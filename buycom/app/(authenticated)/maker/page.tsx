@@ -291,8 +291,8 @@ export default function AdminDashboard() {
             // Add header text
             doc.setFontSize(24);
             doc.setFont('bold');
-            doc.setTextColor(0, 0, 0); // Set text color to black
             doc.text("Customer Due Diligence Report", 50, 15);
+
             
             // Draw an underline beneath the text
             let textWidth = doc.getTextWidth("Customer Due Diligence Report");
