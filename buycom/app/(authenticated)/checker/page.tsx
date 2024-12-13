@@ -279,7 +279,7 @@ export default function UserDashboard() {
 
             // Add header text
             doc.setFontSize(24);
-            doc.text("COMPANY GST3B SUMMARY", 50, 15);
+            doc.text("Customer Due Diligence Report", 50, 15);
             doc.setFontSize(10);
 
             // Add summary data as a table
