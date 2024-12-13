@@ -584,7 +584,7 @@ export default function AdminDashboard() {
                                     <TableCell>{item.legal_name}</TableCell>
                                     <TableCell>{item.gstin}</TableCell>
                                     <TableCell>{item.state || ''}</TableCell>
-                                    <TableCell>{item.fetch_date}</TableCell>
+                                    <TableCell>{item.result}</TableCell>
                                     <TableCell>{item.annual_turnover || ''}</TableCell>
                                     <TableCell>{item.result || ''}</TableCell>
                                     <TableCell>
