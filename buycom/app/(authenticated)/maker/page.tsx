@@ -290,7 +290,18 @@ export default function AdminDashboard() {
             
             // Add header text
             doc.setFontSize(24);
+            doc.setFont('bold');
+            doc.setTextColor(0, 0, 0); // Set text color to black
             doc.text("Customer Due Diligence Report", 50, 15);
+            
+            // Draw an underline beneath the text
+            const textWidth = doc.getTextWidth("Customer Due Diligence Report");
+            const xPos = 50; // X position for the underline
+            const yPos = 22; // Y position just below the text
+            doc.setDrawColor(0, 0, 0); // Set underline color to black
+            doc.line(xPos, yPos, xPos + textWidth, yPos); // Draw the underline
+            
+            // Set font size for the rest of the content
             doc.setFontSize(10);
 
             // Add summary data as a table
