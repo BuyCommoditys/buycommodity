@@ -282,8 +282,6 @@ export default function AdminDashboard() {
             const doc = new jsPDF();
 
             
-            const logoBase64 = "data:image/png;base64,...."; // Replace with your actual Base64 logo string
-            doc.addImage(logoBase64, "PNG", 10, 5, 30, 30);
 
                         
             // const logoBase64 = "data:image/png;base64,...."; 
