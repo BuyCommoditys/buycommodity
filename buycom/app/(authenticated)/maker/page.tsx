@@ -385,7 +385,7 @@ export default function AdminDashboard() {
 
             // Add Other records table
             if (otherTableData.length > 0) {
-                doc.setFontSize(24);
+                doc.setFontSize(20);
                 doc.text("Other Records", 80, yPos - 5);
                 doc.autoTable({
                     startY: yPos,
