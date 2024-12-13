@@ -293,14 +293,6 @@ export default function AdminDashboard() {
             doc.setFont('bold');
             doc.text("Customer Due Diligence Report", 50, 15);
 
-            
-            // Draw an underline beneath the text
-            let textWidth = doc.getTextWidth("Customer Due Diligence Report");
-            let xPos = 50; // X position for the underline
-            let yPos = 22; // Y position just below the text
-            doc.setDrawColor(0, 0, 0); // Set underline color to black
-            doc.line(xPos, yPos, xPos + textWidth, yPos); // Draw the underline
-            
             // Set font size for the rest of the content
             doc.setFontSize(10);
 
